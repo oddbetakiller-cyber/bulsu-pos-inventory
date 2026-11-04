@@ -1,11 +1,13 @@
 // src/pages/CashierPinLogin.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   auth,
   googleProvider,
   rtdb,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
 } from '../firebase/firebaseConfig';
 import { ref, get, update } from 'firebase/database';
@@ -19,6 +21,24 @@ import {
   clearFailedAttempts,
 } from '../utils/security';
 
+const getGoogleSignInError = (error) => {
+  switch (error?.code) {
+    case 'auth/unauthorized-domain':
+      return `This site is not authorized for Google sign-in. Add "${window.location.hostname}" under Firebase Console → Authentication → Settings → Authorized domains.`;
+    case 'auth/operation-not-allowed':
+      return 'Google sign-in is disabled. Enable the Google provider in Firebase Console → Authentication → Sign-in method.';
+    case 'auth/popup-blocked':
+      return 'The sign-in popup was blocked. Retrying with a redirect…';
+    case 'auth/network-request-failed':
+      return 'Google sign-in could not reach Firebase. Check your internet connection and try again.';
+    case 'database/permission-denied':
+    case 'PERMISSION_DENIED':
+      return 'Google sign-in succeeded, but Firebase Database blocked access to cashier accounts. Check the Realtime Database rules for authenticated cashier reads.';
+    default:
+      return error?.message || 'Google sign-in failed. Please try again.';
+  }
+};
+
 const CashierPinLogin = () => {
   const [pin, setPin] = useState('');
   const [email, setEmail] = useState('');
@@ -29,6 +49,63 @@ const CashierPinLogin = () => {
   const [lockout, setLockout] = useState({ isLocked: false, remainingSeconds: 0 });
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  const completeGoogleLogin = useCallback(async (credential) => {
+    const googleUser = credential.user;
+    const userEmail = googleUser.email?.trim().toLowerCase();
+    if (!userEmail) {
+      throw new Error('The selected Google account did not provide an email address.');
+    }
+
+    const snapshot = await get(ref(rtdb, 'cashiers'));
+    const cashiersData = snapshot.val() || {};
+    const match = Object.entries(cashiersData).find(([, cashier]) =>
+      String(cashier.email || '').trim().toLowerCase() === userEmail
+    );
+    const authorizedCashier = match ? { id: match[0], ...match[1] } : null;
+
+    if (!authorizedCashier) {
+      throw new Error(`Google account "${googleUser.email}" is not registered as an authorized cashier. Ask an administrator to add this exact email.`);
+    }
+    if (authorizedCashier.active === false) {
+      throw new Error('This cashier account is inactive. Please contact the administrator.');
+    }
+
+    clearFailedAttempts('cashier');
+    const cashierDisplayName =
+      authorizedCashier.name ||
+      [authorizedCashier.firstName, authorizedCashier.lastName].filter(Boolean).join(' ') ||
+      googleUser.displayName ||
+      googleUser.email;
+
+    login({
+      role: 'cashier',
+      id: authorizedCashier.id,
+      name: cashierDisplayName,
+      email: googleUser.email,
+    });
+    navigate('/cashier/pos');
+  }, [login, navigate]);
+
+  useEffect(() => {
+    let isMounted = true;
+    getRedirectResult(auth)
+      .then(async (credential) => {
+        if (!credential?.user || !isMounted) return;
+        setIsSubmitting(true);
+        await completeGoogleLogin(credential);
+      })
+      .catch((authError) => {
+        if (isMounted) setError(getGoogleSignInError(authError));
+      })
+      .finally(() => {
+        if (isMounted) setIsSubmitting(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [completeGoogleLogin]);
 
   // Tick lockout countdown if active
   useEffect(() => {
@@ -229,53 +306,19 @@ const CashierPinLogin = () => {
 
     try {
       const res = await signInWithPopup(auth, googleProvider);
-      const userEmail = res.user.email?.toLowerCase();
-
-      // Check if this Google account is authorized in RTDB cashiers
-      const snapshot = await get(ref(rtdb, 'cashiers'));
-      let authorizedCashier = null;
-
-      if (snapshot.exists()) {
-        const cashiersData = snapshot.val();
-        for (let id in cashiersData) {
-          const c = cashiersData[id];
-          if (c.email && c.email.toLowerCase() === userEmail) {
-            authorizedCashier = { id, ...c };
-            break;
-          }
-        }
-      }
-
-      if (!authorizedCashier) {
-        setError(`Google account "${res.user.email}" is not registered as an authorized staff member.`);
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (authorizedCashier.active === false) {
-        setError('This cashier account is inactive. Please contact the administrator.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      clearFailedAttempts('cashier');
-
-      const cashierDisplayName =
-        authorizedCashier.name ||
-        [authorizedCashier.firstName, authorizedCashier.lastName].filter(Boolean).join(' ') ||
-        res.user.displayName ||
-        res.user.email;
-
-      login({
-        role: 'cashier',
-        id: authorizedCashier.id,
-        name: cashierDisplayName,
-        email: res.user.email,
-      });
-
-      navigate('/cashier/pos');
+      await completeGoogleLogin(res);
     } catch (err) {
-      setError(err.message || 'Google sign-in failed.');
+      if (err.code === 'auth/popup-blocked') {
+        setError(getGoogleSignInError(err));
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectError) {
+          setError(getGoogleSignInError(redirectError));
+        }
+      } else {
+        setError(getGoogleSignInError(err));
+      }
     } finally {
       setIsSubmitting(false);
     }

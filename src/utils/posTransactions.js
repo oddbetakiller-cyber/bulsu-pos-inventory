@@ -5,7 +5,9 @@ const INVENTORY_OPERATIONS_KEY = '__posOperations';
 
 const transactAt = async (nodeRef, mutate) => {
   // Load this specific database node so the transaction uses the same scope as its rules.
-  await get(nodeRef);
+  const initialSnapshot = await get(nodeRef);
+  const initialValue = initialSnapshot.val();
+  let isFirstAttempt = true;
 
   let abortReason = '';
   let resultValue;
@@ -14,7 +16,14 @@ const transactAt = async (nodeRef, mutate) => {
     (currentValue) => {
       abortReason = '';
       resultValue = undefined;
-      const result = mutate(currentValue);
+      // A transaction may first run against an empty local cache. Use the value
+      // just read from the server for that first attempt, then trust subsequent
+      // server retries so concurrent changes are still handled safely.
+      const value = isFirstAttempt && currentValue === null && initialSnapshot.exists()
+        ? initialValue
+        : currentValue;
+      isFirstAttempt = false;
+      const result = mutate(value);
       if (result.error) {
         abortReason = result.error;
         return;

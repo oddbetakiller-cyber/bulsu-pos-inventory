@@ -204,8 +204,10 @@ const StockManagement = () => {
                   <td className="p-4 text-gray-600">₱{(Number(item.price) || 0).toFixed(2)}</td>
                   <td className="p-4 font-semibold">{item.quantity}</td>
                   <td className="p-4">
-                    {item.quantity <= 5 ? (
-                      <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-black">LOW STOCK</span>
+                    {Number(item.quantity) <= 0 ? (
+                      <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-black">NO STOCK</span>
+                    ) : Number(item.quantity) <= 5 ? (
+                      <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-black">LOW STOCK</span>
                     ) : (
                       <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-black">AVAILABLE</span>
                     )}

@@ -3,7 +3,9 @@ import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
   GoogleAuthProvider, 
+  getRedirectResult,
   signInWithPopup, 
+  signInWithRedirect,
   signInWithEmailAndPassword, 
   signOut 
 } from "firebase/auth";
@@ -40,6 +42,7 @@ if (missingConfig.length > 0) {
 export const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
 const rtdb = getDatabase(app);
 
 // Single unified export to avoid duplicates:
@@ -48,6 +51,8 @@ export {
   googleProvider, 
   rtdb, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword, 
   signOut 
 };
