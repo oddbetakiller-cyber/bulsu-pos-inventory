@@ -58,6 +58,10 @@ jobs:
               exit 1
             fi
           done
+          if [[ ! "$VITE_FIREBASE_API_KEY" =~ ^AIza[A-Za-z0-9_-]+$ ]]; then
+            echo "VITE_FIREBASE_API_KEY must contain only the raw Firebase web API key (starting with AIza), without quotes, labels, or spaces." >&2
+            exit 1
+          fi
 
       - name: Build app
         env:
