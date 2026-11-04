@@ -259,6 +259,9 @@ textarea::placeholder {
 .max-w-md { 
   max-width: 28rem; 
 }
+.max-w-lg {
+  max-width: 32rem;
+}
 
 .mb-1 { 
   margin-bottom: .25rem; 
@@ -1313,7 +1316,8 @@ table {
 }
 
 .z-50 {
-  z-index: 50 !important;
+  /* Keep dialogs above the fixed admin sidebar and mobile navigation. */
+  z-index: 1000 !important;
 }
 
 .z-\[9999\], .z-9999 {

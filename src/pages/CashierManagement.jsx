@@ -14,12 +14,14 @@ import {
   AlertCircle,
   X,
   Lock,
+  Search,
 } from 'lucide-react';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { hashPin, verifyPin } from '../utils/security';
 
 const CashierManagement = () => {
   const [cashiers, setCashiers] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Form state
@@ -50,6 +52,24 @@ const CashierManagement = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredCashiers = normalizedSearch
+    ? cashiers.filter((cashier) => {
+        const searchableText = [
+          cashier.name,
+          cashier.firstName,
+          cashier.middleName,
+          cashier.lastName,
+          cashier.email,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        return searchableText.includes(normalizedSearch);
+      })
+    : cashiers;
 
   const resetForm = () => {
     setFirstName('');
@@ -215,6 +235,34 @@ const CashierManagement = () => {
         </div>
       )}
 
+      {/* Search Cashier Accounts */}
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full max-w-md items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 shadow-sm focus-within:border-[#8B1E2D] focus-within:ring-2 focus-within:ring-[#8B1E2D]/10">
+          <Search size={18} className="shrink-0 text-gray-400" aria-hidden="true" />
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search by cashier name or email"
+            aria-label="Search cashier accounts by name or email"
+            className="min-w-0 flex-1 border-0 bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              aria-label="Clear cashier search"
+              className="shrink-0 rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        <p className="text-xs font-semibold text-gray-500" aria-live="polite">
+          Showing {filteredCashiers.length} of {cashiers.length} cashier{cashiers.length === 1 ? '' : 's'}
+        </p>
+      </div>
+
       {/* Cashiers Table */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
@@ -236,8 +284,14 @@ const CashierManagement = () => {
                     No cashier accounts found. Click <strong>"Add New Cashier"</strong> to create one.
                   </td>
                 </tr>
+              ) : filteredCashiers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-gray-500">
+                    No cashier accounts match <strong>"{searchTerm.trim()}"</strong>.
+                  </td>
+                </tr>
               ) : (
-                cashiers.map((c) => {
+                filteredCashiers.map((c) => {
                   const displayName =
                     c.name ||
                     [c.firstName, c.middleName, c.lastName].filter(Boolean).join(' ') ||

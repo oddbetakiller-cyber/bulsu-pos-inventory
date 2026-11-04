@@ -292,12 +292,12 @@ export const voidSaleAndRestock = async (saleId, voidedBy) => {
     saleToVoid = await transactAt(saleRef, (sale) => {
       if (!sale) return { error: 'Receipt not found.' };
       if (sale.voided) return { error: 'This receipt has already been voided.' };
-      if (sale.voiding) return { error: 'This receipt is already being voided. Refresh the sales list.' };
+      // Another tab or an interrupted attempt may already have claimed it.
+      // Restocking is idempotent because the stock transaction records a marker.
+      if (sale.voiding) return { data: sale, value: sale };
       const claimedSale = { ...sale, voiding: true };
       return { data: claimedSale, value: claimedSale };
     });
-  } else if (!existingRestock.exists()) {
-    throw new Error('This receipt is already being voided. Refresh the sales list and try again shortly.');
   }
 
   try {
@@ -321,6 +321,15 @@ export const voidSaleAndRestock = async (saleId, voidedBy) => {
       return { data: updatedSale, value: updatedSale };
     });
   } catch (error) {
+    // A parallel void may have completed successfully while this caller was
+    // finishing. Treat that as success rather than showing a false failure.
+    try {
+      const latestSale = (await get(saleRef)).val();
+      if (latestSale?.voided && latestSale.inventoryRestocked) return latestSale;
+    } catch {
+      // Preserve the original failure and continue recovery below.
+    }
+
     try {
       const restockState = await get(stockOperationsRef);
       if (!restockState.exists()) {
