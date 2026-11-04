@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Check, Printer, X } from 'lucide-react';
 
@@ -16,7 +16,7 @@ const ShiftReportModal = ({ reading, onClose }) => {
   const isClosing = reading?.type === 'Z';
   const handlePrint = useReactToPrint({
     contentRef: reportRef,
-    documentTitle: `BulSU-${isClosing ? 'Z' : 'X'}-Reading-${reading?.createdAt || Date.now()}`,
+    documentTitle: `BulSU-${isClosing ? 'Z' : 'X'}-Reading-${reading?.createdAt || 'Reading'}`,
     pageStyle: `
       @page { size: auto; margin: 10mm; }
       @media print {

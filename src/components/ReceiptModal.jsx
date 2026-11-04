@@ -1,5 +1,5 @@
 // src/components/ReceiptModal.jsx
-import React, { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { Printer, Check, X, Receipt, Layers, FileText } from 'lucide-react';
 import bulsuLogo from '../assets/bulsu logo.jpg';
@@ -15,6 +15,12 @@ const getCopyLabel = (copyIndex, totalCopies) => {
   if (totalCopies === 1) return 'Customer Copy';
   if (copyIndex < COPY_LABELS.length) return COPY_LABELS[copyIndex];
   return `Copy #${copyIndex + 1}`;
+};
+
+const DISCOUNT_LABELS = {
+  senior: 'Senior Citizen',
+  pwd: 'PWD',
+  student: 'Student',
 };
 
 const formatPeso = (val) => {
@@ -38,6 +44,8 @@ const ReceiptPaperView = ({ receipt, copyIdx, totalCopies }) => {
     : paymentMethod === 'maya'
       ? 'Maya'
       : 'Cash';
+  const discountLabel = DISCOUNT_LABELS[receipt.discountType] ||
+    (Number(receipt.discountPercentage) > 0 ? 'Special Discount' : '');
 
   return (
     <div className="printable-receipt mx-auto max-w-sm rounded-2xl bg-white p-6 shadow-sm border border-gray-200 font-mono text-xs text-gray-800">
@@ -111,6 +119,20 @@ const ReceiptPaperView = ({ receipt, copyIdx, totalCopies }) => {
             <span className="shrink-0 text-gray-500">Payment Reference:</span>
             <span className="break-all text-right font-bold text-gray-800">{receipt.paymentReference}</span>
           </div>
+        )}
+        {discountLabel && (
+          <>
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-gray-500">Discount Type:</span>
+              <span className="text-right font-bold text-gray-800">{discountLabel}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="shrink-0 text-gray-500">Discount ID:</span>
+              <span className="break-all text-right font-bold text-gray-800">
+                {receipt.discountId || 'Not recorded'}
+              </span>
+            </div>
+          </>
         )}
       </div>
 

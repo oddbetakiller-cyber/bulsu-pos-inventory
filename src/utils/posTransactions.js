@@ -1,5 +1,6 @@
 import { get, push, ref, runTransaction } from 'firebase/database';
 import { rtdb } from '../firebase/firebaseConfig';
+import { roundMoney } from './financials';
 
 const INVENTORY_OPERATIONS_KEY = '__posOperations';
 
@@ -215,7 +216,7 @@ export const checkoutWithStock = async ({
     });
     shiftClaimed = true;
 
-    await transactAt(stocksRef, (currentStocks) => {
+    const saleItems = await transactAt(stocksRef, (currentStocks) => {
       if (!currentStocks) return { error: 'No inventory records were found.' };
       const updatedStocks = { ...currentStocks };
 
@@ -228,9 +229,51 @@ export const checkoutWithStock = async ({
         updatedStocks[stockId] = { ...stock, quantity: available - item.qty };
       }
 
-      return { data: updatedStocks, value: true };
+      const committedItems = items.map((item) => {
+        const stock = currentStocks[item.id];
+        const committedItem = {
+          id: item.id,
+          name: item.name,
+          sku: item.sku || '',
+          category: item.category || '',
+          price: Number(item.price) || 0,
+          qty: Number(item.qty),
+        };
+        const unitCost = stock.costPrice;
+        if (
+          unitCost !== null &&
+          unitCost !== undefined &&
+          unitCost !== '' &&
+          Number.isFinite(Number(unitCost)) &&
+          Number(unitCost) >= 0
+        ) {
+          committedItem.costPrice = roundMoney(unitCost);
+        }
+        return committedItem;
+      });
+
+      return { data: updatedStocks, value: committedItems };
     });
     inventoryDeducted = true;
+
+    const cogsComplete = saleItems.every(
+      (item) => item.costPrice !== undefined && Number.isFinite(Number(item.costPrice))
+    );
+    const cogs = cogsComplete
+      ? roundMoney(saleItems.reduce((total, item) => total + item.costPrice * item.qty, 0))
+      : null;
+    const grossProfit = cogsComplete ? roundMoney(Number(savedReceipt.total) - cogs) : null;
+    savedReceipt = {
+      ...savedReceipt,
+      items: saleItems,
+      cogsComplete,
+      cogs,
+      grossProfit,
+      grossMarginPercentage:
+        cogsComplete && Number(savedReceipt.total) > 0
+          ? roundMoney((grossProfit / Number(savedReceipt.total)) * 100)
+          : null,
+    };
 
     await transactAt(saleRef, (existingSale) => {
       if (existingSale) return { error: 'This receipt already exists. Please try checkout again.' };
@@ -261,7 +304,10 @@ export const checkoutWithStock = async ({
           });
         }
       } catch (rollbackError) {
-        throw new Error(`${error.message} Inventory rollback failed: ${rollbackError.message}`);
+        throw new Error(
+          `${error.message} Inventory rollback failed: ${rollbackError.message}`,
+          { cause: rollbackError }
+        );
       }
     }
     if (saleSaved) return savedReceipt;

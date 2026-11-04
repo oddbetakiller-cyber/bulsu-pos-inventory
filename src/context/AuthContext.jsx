@@ -1,5 +1,5 @@
 // src/context/AuthContext.jsx
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { auth, signOut } from "../firebase/firebaseConfig";
 
 const AuthContext = createContext();
@@ -146,4 +146,5 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- The context intentionally exports its matching hook.
 export const useAuth = () => useContext(AuthContext);

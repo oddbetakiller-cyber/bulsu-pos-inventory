@@ -1,4 +1,3 @@
-import React from 'react';
 import { Trash2, X } from 'lucide-react';
 
 const ConfirmDeleteModal = ({

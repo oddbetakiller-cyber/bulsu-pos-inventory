@@ -1,5 +1,4 @@
 // src/pages/LoginSelection.jsx
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, UserCheck, Clock, X } from 'lucide-react';
 import bulsuLogo from "../assets/bulsu logo.jpg";

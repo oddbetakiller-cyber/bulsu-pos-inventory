@@ -30,10 +30,17 @@ import {
   summarizeShift,
 } from '../utils/posTransactions';
 
+const DISCOUNT_LABELS = {
+  senior: 'Senior Citizen',
+  pwd: 'PWD',
+  student: 'Student',
+};
+
 const CashierPOS = () => {
   const [stocks, setStocks] = useState([]);
   const [cart, setCart] = useState([]);
   const [discountType, setDiscountType] = useState('none'); // 'none', 'pwd', 'senior', 'student'
+  const [discountId, setDiscountId] = useState('');
   const [cashTendered, setCashTendered] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentReference, setPaymentReference] = useState('');
@@ -204,6 +211,8 @@ const CashierPOS = () => {
   const clearCart = () => {
     if (isCheckingOut) return;
     setCart([]);
+    setDiscountType('none');
+    setDiscountId('');
     setCashTendered('');
     setPaymentReference('');
     setCheckoutError('');
@@ -331,6 +340,10 @@ const CashierPOS = () => {
       setCheckoutError('Open a cashier shift before checking out.');
       return;
     }
+    if (discountType !== 'none' && !discountId.trim()) {
+      setCheckoutError(`Enter the ${DISCOUNT_LABELS[discountType] || 'discount'} ID number.`);
+      return;
+    }
     if (paymentMethod !== 'cash' && !paymentReference.trim()) {
       setCheckoutError(`Enter the ${paymentMethod === 'gcash' ? 'GCash' : 'Maya'} reference number.`);
       return;
@@ -360,6 +373,7 @@ const CashierPOS = () => {
       })),
       subtotal,
       discountType,
+      discountId: discountType === 'none' ? null : discountId.trim(),
       discountPercentage: discountRate * 100,
       discountAmount,
       total,
@@ -371,7 +385,7 @@ const CashierPOS = () => {
       cashierId: currentCashier.id || null,
       shiftId: currentShift.id,
       timestamp: new Date().toLocaleString(),
-      timestampMs: Date.now(),
+      timestampMs: new Date().getTime(),
       voided: false,
     };
 
@@ -397,6 +411,7 @@ const CashierPOS = () => {
       setIsReceiptOpen(true);
       setCart([]);
       setDiscountType('none');
+      setDiscountId('');
       setCashTendered('');
       setPaymentMethod('cash');
       setPaymentReference('');
@@ -680,7 +695,11 @@ const CashierPOS = () => {
             </label>
             <select
               value={discountType}
-              onChange={(e) => setDiscountType(e.target.value)}
+              onChange={(e) => {
+                setDiscountType(e.target.value);
+                setDiscountId('');
+                setCheckoutError('');
+              }}
               className="w-full rounded-xl border border-gray-200 bg-gray-50 p-2 text-xs font-bold text-gray-700 focus:outline-none focus:border-[#8B1E2D]"
             >
               <option value="none">Regular (No Discount)</option>
@@ -688,6 +707,27 @@ const CashierPOS = () => {
               <option value="pwd">PWD (20% Off)</option>
               <option value="student">Student (10% Off)</option>
             </select>
+            {discountType !== 'none' && (
+              <div className="mt-2">
+                <label htmlFor="discount-id" className="mb-1 block text-xs font-bold text-gray-600">
+                  {DISCOUNT_LABELS[discountType]} ID Number
+                </label>
+                <input
+                  id="discount-id"
+                  type="text"
+                  value={discountId}
+                  onChange={(event) => {
+                    setDiscountId(event.target.value);
+                    setCheckoutError('');
+                  }}
+                  maxLength={60}
+                  autoComplete="off"
+                  placeholder={`Enter ${DISCOUNT_LABELS[discountType]} ID number`}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 p-2 text-sm font-semibold text-gray-900 focus:border-[#8B1E2D] focus:outline-none"
+                  required
+                />
+              </div>
+            )}
           </div>
 
           {/* Payment method and tender details */}

@@ -1,7 +1,7 @@
 // src/pages/AdminPinLogin.jsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { KeyRound, ArrowLeft, ShieldAlert, Clock, AlertTriangle } from 'lucide-react';
+import { KeyRound, ArrowLeft, Clock, AlertTriangle } from 'lucide-react';
 import { rtdb } from '../firebase/firebaseConfig';
 import { ref, get, set, update } from 'firebase/database';
 import { useAuth } from '../context/AuthContext';
@@ -17,16 +17,13 @@ const AdminPinLogin = () => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [lockout, setLockout] = useState({ isLocked: false, remainingSeconds: 0 });
+  const [lockout, setLockout] = useState(() => getLockoutStatus('admin'));
   const navigate = useNavigate();
   const { login } = useAuth();
 
   // Check lockout on mount and tick countdown
   useEffect(() => {
-    const status = getLockoutStatus('admin');
-    setLockout(status);
-
-    if (status.isLocked) {
+    if (lockout.isLocked) {
       const interval = setInterval(() => {
         const updated = getLockoutStatus('admin');
         setLockout(updated);
@@ -37,7 +34,7 @@ const AdminPinLogin = () => {
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, []);
+  }, [lockout.isLocked]);
 
   const handleLogin = async (e) => {
     e.preventDefault();

@@ -1,11 +1,12 @@
 // src/pages/SalesReport.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { rtdb } from '../firebase/firebaseConfig';
 import { ref, onValue } from 'firebase/database';
-import { Receipt, Ban, Printer, CheckSquare, Square, Layers, Search, RefreshCw } from 'lucide-react';
+import { Receipt, Ban, Printer, CheckSquare, Square, Search } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { useAuth } from '../context/AuthContext';
 import { voidSaleAndRestock } from '../utils/posTransactions';
+import { getSaleCogs, getSaleGrossProfit } from '../utils/financials';
 
 const SalesReport = () => {
   const [sales, setSales] = useState([]);
@@ -186,6 +187,8 @@ const SalesReport = () => {
         <div className="space-y-4">
           {filteredSales.map((sale) => {
             const isSelected = selectedIds.includes(sale.id);
+            const saleCogs = getSaleCogs(sale);
+            const saleGrossProfit = getSaleGrossProfit(sale);
 
             return (
               <div
@@ -232,6 +235,11 @@ const SalesReport = () => {
                       {sale.paymentReference && (
                         <span>Reference: <strong className="font-mono text-gray-700">{sale.paymentReference}</strong></span>
                       )}
+                      {sale.discountType && sale.discountType !== 'none' && (
+                        <span>
+                          Discount ID: <strong className="font-mono text-gray-700">{sale.discountId || 'Not recorded'}</strong>
+                        </span>
+                      )}
                     </div>
 
                     {/* Itemized preview */}
@@ -249,6 +257,16 @@ const SalesReport = () => {
                           </li>
                         ))}
                       </ul>
+                      {saleCogs !== null ? (
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 rounded-lg bg-slate-50 px-2.5 py-2 text-[11px]">
+                          <span className="text-gray-600">COGS: <strong className="text-gray-800">₱{saleCogs.toFixed(2)}</strong></span>
+                          <span className="text-emerald-700">Gross Profit: <strong>₱{Number(saleGrossProfit || 0).toFixed(2)}</strong></span>
+                        </div>
+                      ) : !sale.voided ? (
+                        <p className="mt-2 text-[11px] font-medium text-amber-700">
+                          COGS and gross profit unavailable: item cost was not recorded for this sale.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>

@@ -1,5 +1,5 @@
 // src/pages/CashierPinLogin.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   auth,
@@ -46,7 +46,7 @@ const CashierPinLogin = () => {
   const [authMode, setAuthMode] = useState('pin'); // 'pin' or 'email'
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [lockout, setLockout] = useState({ isLocked: false, remainingSeconds: 0 });
+  const [lockout, setLockout] = useState(() => getLockoutStatus('cashier'));
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -109,10 +109,7 @@ const CashierPinLogin = () => {
 
   // Tick lockout countdown if active
   useEffect(() => {
-    const status = getLockoutStatus('cashier');
-    setLockout(status);
-
-    if (status.isLocked) {
+    if (lockout.isLocked) {
       const interval = setInterval(() => {
         const updated = getLockoutStatus('cashier');
         setLockout(updated);
@@ -123,7 +120,7 @@ const CashierPinLogin = () => {
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, []);
+  }, [lockout.isLocked]);
 
   const handlePinLogin = async (e) => {
     e.preventDefault();

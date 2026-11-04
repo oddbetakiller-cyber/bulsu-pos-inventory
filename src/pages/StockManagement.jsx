@@ -1,8 +1,8 @@
 // src/pages/StockManagement.jsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { rtdb } from '../firebase/firebaseConfig';
 import { ref, onValue, push, remove, update, set } from 'firebase/database';
-import { AlertTriangle, Plus, Trash2, Edit3, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Plus, Trash2, Edit3, CheckCircle, Search, X } from 'lucide-react';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 
 const StockManagement = () => {
@@ -11,7 +11,9 @@ const StockManagement = () => {
   const [sku, setSku] = useState('');
   const [category, setCategory] = useState('');
   const [price, setPrice] = useState('');
+  const [costPrice, setCostPrice] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState(null);
   const [formError, setFormError] = useState('');
   const [itemToDelete, setItemToDelete] = useState(null);
@@ -35,6 +37,7 @@ const StockManagement = () => {
     setSku('');
     setCategory('');
     setPrice('');
+    setCostPrice('');
     setQuantity('');
     setEditId(null);
     setFormError('');
@@ -48,6 +51,7 @@ const StockManagement = () => {
     const cleanSku = sku.trim().toUpperCase();
     const cleanCategory = category.trim();
     const numericPrice = Number(price);
+    const numericCostPrice = Number(costPrice);
     const numericQuantity = Number(quantity);
 
     if (!cleanName || !cleanSku || !cleanCategory) {
@@ -56,6 +60,10 @@ const StockManagement = () => {
     }
     if (!Number.isFinite(numericPrice) || numericPrice < 0) {
       setFormError('Enter a valid unit price.');
+      return;
+    }
+    if (costPrice === '' || !Number.isFinite(numericCostPrice) || numericCostPrice < 0) {
+      setFormError('Enter a valid unit cost price.');
       return;
     }
     if (!Number.isInteger(numericQuantity) || numericQuantity < 0) {
@@ -76,6 +84,7 @@ const StockManagement = () => {
       sku: cleanSku,
       category: cleanCategory,
       price: numericPrice,
+      costPrice: numericCostPrice,
       quantity: numericQuantity,
     };
 
@@ -98,6 +107,7 @@ const StockManagement = () => {
     setSku(item.sku || '');
     setCategory(item.category || '');
     setPrice(item.price);
+    setCostPrice(item.costPrice ?? '');
     setQuantity(item.quantity);
     setFormError('');
   };
@@ -113,6 +123,7 @@ const StockManagement = () => {
         setSku('');
         setCategory('');
         setPrice('');
+        setCostPrice('');
         setQuantity('');
       }
     } catch (err) {
@@ -124,6 +135,14 @@ const StockManagement = () => {
   };
 
   const categories = [...new Set(stocks.map((item) => item.category).filter(Boolean))];
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredStocks = normalizedSearch
+    ? stocks.filter((item) =>
+        [item.name, item.sku, item.category].some((value) =>
+          String(value || '').toLowerCase().includes(normalizedSearch)
+        )
+      )
+    : stocks;
 
   return (
     <div className="p-8">
@@ -141,7 +160,7 @@ const StockManagement = () => {
       )}
 
       {/* CRUD Form */}
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl shadow-md mb-8 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4 items-end border">
+      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl shadow-md mb-8 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-7 gap-4 items-end border">
         <div className="xl:col-span-2">
           <label className="block text-sm font-bold text-gray-700 mb-1">Product Name</label>
           <input type="text" className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-[#8B1E2D]" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -162,11 +181,15 @@ const StockManagement = () => {
           <input type="number" min="0" step="0.01" className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-[#8B1E2D]" value={price} onChange={(e) => setPrice(e.target.value)} required />
         </div>
         <div>
+          <label className="block text-sm font-bold text-gray-700 mb-1">Cost Price (₱)</label>
+          <input type="number" min="0" step="0.01" className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-[#8B1E2D]" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} required />
+        </div>
+        <div>
           <label className="block text-sm font-bold text-gray-700 mb-1">Quantity</label>
           <input type="number" min="0" step="1" className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-[#8B1E2D]" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
         </div>
-        {formError && <p className="sm:col-span-2 xl:col-span-6 text-sm font-bold text-red-700">{formError}</p>}
-        <div className="sm:col-span-2 xl:col-span-6 flex flex-wrap gap-2">
+        {formError && <p className="sm:col-span-2 xl:col-span-7 text-sm font-bold text-red-700">{formError}</p>}
+        <div className="sm:col-span-2 xl:col-span-7 flex flex-wrap gap-2">
           <button type="submit" className="bg-[#8B1E2D] hover:bg-[#6c1723] text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow">
             {editId ? <CheckCircle size={18} /> : <Plus size={18} />} {editId ? 'Update Product' : 'Add Product'}
           </button>
@@ -176,12 +199,41 @@ const StockManagement = () => {
 
       {/* Inventory Table */}
       <div className="bg-white rounded-2xl shadow overflow-hidden border">
-        <table className="w-full text-left border-collapse">
+        <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-black text-gray-900">Inventory</h2>
+            <p className="text-xs text-gray-500">Search by product name, SKU, or category.</p>
+          </div>
+          <div className="relative w-full sm:max-w-sm">
+            <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search inventory..."
+              aria-label="Search inventory by product name, SKU, or category"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-10 text-sm focus:border-[#8B1E2D] focus:outline-none focus:ring-2 focus:ring-[#8B1E2D]/20"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                aria-label="Clear inventory search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] text-left border-collapse">
           <thead className="bg-[#8B1E2D] text-white">
             <tr>
               <th className="p-4">Product Name</th>
               <th className="p-4">SKU</th>
               <th className="p-4">Category</th>
+              <th className="p-4">Cost Price</th>
               <th className="p-4">Unit Price</th>
               <th className="p-4">Quantity</th>
               <th className="p-4">Status / Notification</th>
@@ -191,16 +243,23 @@ const StockManagement = () => {
           <tbody>
             {stocks.length === 0 ? (
               <tr>
-                <td colSpan="7" className="p-6 text-center text-gray-500 font-medium">
+                <td colSpan="8" className="p-6 text-center text-gray-500 font-medium">
                   No stock items found.
                 </td>
               </tr>
+            ) : filteredStocks.length === 0 ? (
+              <tr>
+                <td colSpan="8" className="p-6 text-center text-gray-500 font-medium">
+                  No products match “{searchTerm}”.
+                </td>
+              </tr>
             ) : (
-              stocks.map(item => (
+              filteredStocks.map(item => (
                 <tr key={item.id} className="border-b hover:bg-gray-50">
                   <td className="p-4 font-bold text-gray-800">{item.name}</td>
                   <td className="p-4 font-mono text-sm text-gray-600">{item.sku || '—'}</td>
                   <td className="p-4 text-gray-600">{item.category || '—'}</td>
+                  <td className="p-4 text-gray-600">{item.costPrice === undefined || item.costPrice === null || item.costPrice === '' ? 'Not set' : `₱${(Number(item.costPrice) || 0).toFixed(2)}`}</td>
                   <td className="p-4 text-gray-600">₱{(Number(item.price) || 0).toFixed(2)}</td>
                   <td className="p-4 font-semibold">{item.quantity}</td>
                   <td className="p-4">
@@ -221,6 +280,7 @@ const StockManagement = () => {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Delete Confirmation Modal */}

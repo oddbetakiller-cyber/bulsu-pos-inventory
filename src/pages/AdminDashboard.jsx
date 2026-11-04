@@ -16,10 +16,8 @@ import {
   AlertOctagon,
   ShieldCheck,
   Layers,
-  Printer,
-  Receipt,
 } from "lucide-react";
-import ReceiptModal from "../components/ReceiptModal";
+import { getSaleCogs, getSaleGrossProfit, roundMoney } from "../utils/financials";
 
 export default function AdminDashboard() {
   const [sales, setSales] = useState([]);
@@ -180,10 +178,46 @@ export default function AdminDashboard() {
   const inventoryValue = useMemo(() => {
     return stocks.reduce((acc, item) => {
       const q = Number(item.quantity) || 0;
-      const p = Number(item.price) || 0;
-      return acc + q * p;
+      const cost = Number(item.costPrice);
+      return Number.isFinite(cost) && cost >= 0 ? acc + q * cost : acc;
     }, 0);
   }, [stocks]);
+
+  const uncostedStockCount = useMemo(
+    () => stocks.filter((item) =>
+      item.costPrice === null ||
+      item.costPrice === undefined ||
+      item.costPrice === '' ||
+      !Number.isFinite(Number(item.costPrice)) ||
+      Number(item.costPrice) < 0
+    ).length,
+    [stocks]
+  );
+
+  const costedSales = useMemo(
+    () => validSales.filter((sale) => getSaleCogs(sale) !== null),
+    [validSales]
+  );
+
+  const totalCogs = useMemo(
+    () => roundMoney(costedSales.reduce((sum, sale) => sum + getSaleCogs(sale), 0)),
+    [costedSales]
+  );
+
+  const grossProfit = useMemo(
+    () => roundMoney(costedSales.reduce((sum, sale) => sum + (getSaleGrossProfit(sale) || 0), 0)),
+    [costedSales]
+  );
+
+  const costedSalesRevenue = useMemo(
+    () => roundMoney(costedSales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0)),
+    [costedSales]
+  );
+
+  const grossMarginPercentage = costedSalesRevenue > 0
+    ? (grossProfit / costedSalesRevenue) * 100
+    : 0;
+  const uncostedSalesCount = validSales.length - costedSales.length;
 
   const outOfStockItems = useMemo(
     () => stocks.filter((item) => (Number(item.quantity) || 0) <= 0),
@@ -418,7 +452,7 @@ export default function AdminDashboard() {
             </span>
             <span className="text-gray-300">•</span>
             <span className="text-gray-400 font-medium">
-              Val: {formatPeso(inventoryValue)}
+              Cost value: {formatPeso(inventoryValue)}
             </span>
           </div>
         </article>
@@ -656,6 +690,27 @@ export default function AdminDashboard() {
               </div>
 
               <div className="flex items-center justify-between rounded-xl bg-gray-50 p-2.5">
+                <span className="font-semibold text-gray-500">COGS (costed sales)</span>
+                <span className="font-black text-gray-900">{formatPeso(totalCogs)}</span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2.5">
+                <span className="font-semibold text-emerald-700">Actual Gross Profit</span>
+                <span className="font-black text-emerald-800">{formatPeso(grossProfit)}</span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2.5">
+                <span className="font-semibold text-emerald-700">Gross Margin</span>
+                <span className="font-black text-emerald-800">{grossMarginPercentage.toFixed(2)}%</span>
+              </div>
+
+              {(uncostedSalesCount > 0 || uncostedStockCount > 0) && (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800">
+                  Profit uses {costedSales.length} fully costed sale(s); {uncostedSalesCount} sale(s) need cost data and {uncostedStockCount} inventory item(s) have no cost price.
+                </p>
+              )}
+
+              <div className="flex items-center justify-between rounded-xl bg-gray-50 p-2.5">
                 <span className="font-semibold text-gray-500">
                   Average Order Value (AOV)
                 </span>
@@ -675,7 +730,7 @@ export default function AdminDashboard() {
 
               <div className="flex items-center justify-between rounded-xl bg-blue-50/70 p-2.5">
                 <span className="font-semibold text-blue-700 flex items-center gap-1">
-                  <Package size={13} /> Inventory Asset Value
+                  <Package size={13} /> Inventory Cost Value
                 </span>
                 <span className="font-black text-blue-700">
                   {formatPeso(inventoryValue)}

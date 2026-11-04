@@ -1,5 +1,4 @@
 // src/components/ConfirmLogoutModal.jsx
-import React from 'react';
 import { LogOut, X } from 'lucide-react';
 
 const ConfirmLogoutModal = ({ isOpen, onConfirm, onCancel, isLoggingOut = false, message = 'Are you sure you want to logout?' }) => {

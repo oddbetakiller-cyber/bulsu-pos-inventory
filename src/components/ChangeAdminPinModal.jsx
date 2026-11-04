@@ -1,6 +1,6 @@
 // src/components/ChangeAdminPinModal.jsx
-import React, { useState } from 'react';
-import { KeyRound, X, CheckCircle, AlertTriangle, Lock } from 'lucide-react';
+import { useState } from 'react';
+import { KeyRound, X, CheckCircle, AlertTriangle } from 'lucide-react';
 import { rtdb } from '../firebase/firebaseConfig';
 import { ref, get, update } from 'firebase/database';
 import { hashPin, verifyPin } from '../utils/security';

@@ -1,5 +1,5 @@
 // src/pages/CashierManagement.jsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { rtdb } from '../firebase/firebaseConfig';
 import { ref, onValue, push, remove, update, set } from 'firebase/database';
 import {
